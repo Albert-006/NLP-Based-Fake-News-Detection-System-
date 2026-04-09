@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Home | Fake News Shield{% endblock %}
+{% block content %}
+<section class="grid gap-10 py-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:py-16">
+    <div class="space-y-8">
+        <span class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-2 text-sm text-brand-100 backdrop-blur-xl">
+            Portfolio-ready AI verification platform
+        </span>
+        <div class="space-y-5">
+            <h1 class="max-w-3xl font-display text-4xl font-extrabold leading-tight text-white md:text-6xl">
+                Detect fake news and AI-generated imagery with one secure workflow.
+            </h1>
+            <p class="max-w-2xl text-lg leading-8 text-slate-200">
+                Combine NLP-powered text classification, Sightengine image forensics, account-based history tracking, and a polished dashboard built for trust and speed.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-4">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('dashboard') }}" class="inline-flex items-center rounded-full bg-white px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Open Dashboard</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="inline-flex items-center rounded-full bg-white px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Create Account</a>
+                <a href="{{ url_for('login') }}" class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-6 py-3 font-semibold text-white transition hover:bg-white/10">Sign In</a>
+            {% endif %}
+        </div>
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="glass-card p-5">
+                <p class="text-sm uppercase tracking-[0.3em] text-brand-100">NLP</p>
+                <h3 class="mt-3 text-xl font-bold text-white">Custom Text Model</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Preprocesses text with stemming and stopword removal before vectorization.</p>
+            </div>
+            <div class="glass-card p-5">
+                <p class="text-sm uppercase tracking-[0.3em] text-brand-100">Vision</p>
+                <h3 class="mt-3 text-xl font-bold text-white">Sightengine API</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Checks whether uploaded imagery is AI-generated or authentic with confidence scoring.</p>
+            </div>
+            <div class="glass-card p-5">
+                <p class="text-sm uppercase tracking-[0.3em] text-brand-100">Security</p>
+                <h3 class="mt-3 text-xl font-bold text-white">Protected Accounts</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Flask-Login auth, password hashing, and user-specific analysis history.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="relative">
+        <div class="glass-card relative overflow-hidden p-7 animate-float">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-accent to-cyan-300"></div>
+            <div class="space-y-6">
+                <div class="flex items-center justify-between text-sm text-slate-300">
+                    <span>Live verification pipeline</span>
+                    <span class="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-200">Online</span>
+                </div>
+                <div class="space-y-4">
+                    <div class="rounded-3xl border border-white/10 bg-slate-950/50 p-5">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Text result</p>
+                        <div class="mt-3 flex items-end justify-between">
+                            <div>
+                                <h3 class="text-2xl font-bold text-white">FAKE NEWS</h3>
+                                <p class="mt-1 text-sm text-slate-300">Confidence score: 96.42%</p>
+                            </div>
+                            <span class="rounded-full bg-rose-400/20 px-3 py-1 text-sm text-rose-200">High Risk</span>
+                        </div>
+                    </div>
+                    <div class="rounded-3xl border border-white/10 bg-slate-950/50 p-5">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Image result</p>
+                        <div class="mt-3 flex items-end justify-between">
+                            <div>
+                                <h3 class="text-2xl font-bold text-white">AI-generated</h3>
+                                <p class="mt-1 text-sm text-slate-300">Confidence score: 88.14%</p>
+                            </div>
+                            <span class="rounded-full bg-amber-400/20 px-3 py-1 text-sm text-amber-200">Review</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rounded-3xl border border-dashed border-white/15 p-5 text-sm leading-7 text-slate-300">
+                    Use the dashboard to run text and image checks, then revisit everything later from your personal history timeline.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

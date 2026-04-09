@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Login | Fake News Shield{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-xl py-10 lg:py-16">
+    <div class="glass-card p-8 md:p-10">
+        <div class="mb-8 space-y-3 text-center">
+            <span class="inline-flex rounded-full border border-white/15 bg-white/8 px-4 py-2 text-sm text-brand-100">Welcome back</span>
+            <h1 class="font-display text-3xl font-bold text-white">Sign in to your workspace</h1>
+            <p class="text-slate-300">Access your dashboard, run new analyses, and review your saved results.</p>
+        </div>
+        <form method="POST" class="space-y-5">
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-slate-200">Email address</label>
+                <input type="email" name="email" required class="input-field" placeholder="you@example.com">
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-slate-200">Password</label>
+                <input type="password" name="password" required class="input-field" placeholder="Enter your password">
+            </div>
+            <button type="submit" class="primary-button w-full">Login</button>
+        </form>
+        <p class="mt-6 text-center text-sm text-slate-300">No account yet? <a href="{{ url_for('register') }}" class="font-semibold text-brand-100 hover:text-white">Register here</a>.</p>
+    </div>
+</section>
+{% endblock %}

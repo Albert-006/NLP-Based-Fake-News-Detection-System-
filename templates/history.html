@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}History | Fake News Shield{% endblock %}
+{% block content %}
+<section class="space-y-6 py-8 lg:py-12">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-sm uppercase tracking-[0.35em] text-brand-100">Timeline</p>
+            <h1 class="mt-2 font-display text-3xl font-bold text-white">Your analysis history</h1>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">Back to dashboard</a>
+    </div>
+
+    <div class="glass-card overflow-hidden p-3 md:p-4">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-200">
+                <thead>
+                    <tr class="text-xs uppercase tracking-[0.25em] text-slate-400">
+                        <th class="px-4 py-4">Type</th>
+                        <th class="px-4 py-4">Input</th>
+                        <th class="px-4 py-4">Result</th>
+                        <th class="px-4 py-4">Confidence</th>
+                        <th class="px-4 py-4">Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    {% for entry in entries %}
+                        <tr class="transition hover:bg-white/5">
+                            <td class="px-4 py-4 text-white">{{ 'Text' if entry.prediction else 'Image' }}</td>
+                            <td class="max-w-sm px-4 py-4 text-slate-300">
+                                {% if entry.input_text %}
+                                    {{ entry.input_text[:120] }}{% if entry.input_text|length > 120 %}...{% endif %}
+                                {% else %}
+                                    Uploaded image analysis
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4 font-semibold text-white">{{ entry.prediction or entry.image_result }}</td>
+                            <td class="px-4 py-4 text-slate-300">{{ '%.2f'|format(entry.confidence or 0) }}%</td>
+                            <td class="px-4 py-4 text-slate-300">{{ entry.timestamp.strftime('%d %b %Y %I:%M %p') }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-slate-300">No analysis history yet. Run your first text or image check from the dashboard.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

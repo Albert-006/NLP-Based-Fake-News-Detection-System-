@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Fake News Shield{% endblock %}
+{% block content %}
+<section class="space-y-8 py-8 lg:py-12">
+    <div class="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        <div class="glass-card p-7 md:p-8">
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <p class="text-sm uppercase tracking-[0.35em] text-brand-100">Control Center</p>
+                    <h1 class="mt-2 font-display text-3xl font-bold text-white">Analyze text and image signals</h1>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+                    Signed in as <span class="font-semibold text-white">{{ current_user.username }}</span>
+                </div>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-2">
+                <form method="POST" action="{{ url_for('analyze_text_route') }}" class="analysis-card" id="text-analysis-form">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-white">Fake News Detection</h2>
+                        <span class="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.25em] text-slate-300">NLP Model</span>
+                    </div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-200">Paste article content or headline</label>
+                    <textarea name="news_text" rows="10" class="input-field min-h-[220px] resize-none" placeholder="Enter a news article, social post, or headline for analysis...">{{ submitted_text or '' }}</textarea>
+                    <button type="submit" class="primary-button mt-5 w-full" data-loading-text="Analyzing text...">
+                        Analyze Text
+                    </button>
+                </form>
+
+                <form method="POST" action="{{ url_for('analyze_image_route') }}" enctype="multipart/form-data" class="analysis-card" id="image-analysis-form">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-white">AI Image Detection</h2>
+                        <span class="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.25em] text-slate-300">Sightengine</span>
+                    </div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-200">Upload an image</label>
+                    <label id="drop-zone" class="group flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed border-white/20 bg-slate-950/40 p-6 text-center transition hover:border-brand-100/60 hover:bg-slate-900/60">
+                        <input id="image-input" type="file" name="image_file" accept=".png,.jpg,.jpeg,.webp" class="hidden">
+                        <div class="space-y-3">
+                            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl transition group-hover:scale-105">+</div>
+                            <div>
+                                <p class="text-lg font-semibold text-white">Drag and drop your image</p>
+                                <p class="mt-1 text-sm text-slate-300">or click to browse PNG, JPG, JPEG, or WEBP</p>
+                            </div>
+                            <p id="file-name" class="text-sm text-brand-100"></p>
+                        </div>
+                    </label>
+                    <button type="submit" class="primary-button mt-5 w-full" data-loading-text="Analyzing image...">
+                        Analyze Image
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="glass-card p-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white">Latest Results</h2>
+                    <span class="text-sm text-slate-300">Real-time feedback</span>
+                </div>
+                <div class="mt-5 space-y-4">
+                    <div class="result-card {{ 'border-rose-300/30' if text_result and text_result.label == 'FAKE NEWS' else 'border-emerald-300/30' if text_result else 'border-white/10' }}">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Text analysis</p>
+                        {% if text_result %}
+                            <h3 class="mt-3 text-2xl font-bold text-white">{{ text_result.label }}</h3>
+                            <p class="mt-2 text-sm text-slate-300">Confidence: {{ '%.2f'|format(text_result.confidence) }}%</p>
+                            <p class="mt-2 text-sm text-slate-400">Prediction mapping: `1 = FAKE NEWS`, `0 = REAL NEWS`</p>
+                        {% else %}
+                            <p class="mt-3 text-sm text-slate-300">Run a text analysis to see the classification result and confidence score here.</p>
+                        {% endif %}
+                    </div>
+                    <div class="result-card {{ 'border-amber-300/30' if image_result and image_result.label == 'AI-generated' else 'border-emerald-300/30' if image_result else 'border-white/10' }}">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Image analysis</p>
+                        {% if image_result %}
+                            <h3 class="mt-3 text-2xl font-bold text-white">{{ image_result.label }}</h3>
+                            <p class="mt-2 text-sm text-slate-300">Confidence: {{ '%.2f'|format(image_result.confidence) }}%</p>
+                            <p class="mt-2 text-sm text-slate-400">Generated with Sightengine's `genai` model.</p>
+                        {% else %}
+                            <p class="mt-3 text-sm text-slate-300">Run an image analysis to detect whether the upload appears AI-generated.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white">Recent Activity</h2>
+                    <a href="{{ url_for('history') }}" class="text-sm font-semibold text-brand-100 hover:text-white">View all</a>
+                </div>
+                <div class="mt-5 space-y-3">
+                    {% for entry in recent_history %}
+                        <div class="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-sm font-semibold text-white">{{ entry.prediction or entry.image_result or 'Analysis' }}</p>
+                                <span class="text-xs text-slate-400">{{ entry.timestamp.strftime('%d %b %Y %I:%M %p') }}</span>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-300">Confidence: {{ '%.2f'|format(entry.confidence or 0) }}%</p>
+                        </div>
+                    {% else %}
+                        <div class="rounded-3xl border border-dashed border-white/10 p-4 text-sm text-slate-300">
+                            Your analysis history will appear here after the first successful run.
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="loading-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+    <div class="glass-card flex flex-col items-center gap-4 px-8 py-7 text-center">
+        <div class="h-14 w-14 rounded-full border-4 border-white/20 border-t-brand-100 animate-spin"></div>
+        <div>
+            <p id="loading-message" class="text-lg font-semibold text-white">Processing your request...</p>
+            <p class="mt-1 text-sm text-slate-300">This usually takes a few seconds.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@
                     <h1 class="mt-2 font-display text-3xl font-bold text-white">Analyze text and image signals</h1>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                    Signed in as <span class="font-semibold text-white">{{ current_user.username }}</span>
+                    Public workspace with instant analysis and shared history
                 </div>
             </div>
 
@@ -83,7 +83,7 @@
 
             <div class="glass-card p-6">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-bold text-white">Recent Activity</h2>
+                    <h2 class="text-xl font-bold text-white">Recent Global Activity</h2>
                     <a href="{{ url_for('history') }}" class="text-sm font-semibold text-brand-100 hover:text-white">View all</a>
                 </div>
                 <div class="mt-5 space-y-3">
@@ -95,9 +95,9 @@
                             </div>
                             <p class="mt-2 text-sm text-slate-300">Confidence: {{ '%.2f'|format(entry.confidence or 0) }}%</p>
                         </div>
-                    {% else %}
-                        <div class="rounded-3xl border border-dashed border-white/10 p-4 text-sm text-slate-300">
-                            Your analysis history will appear here after the first successful run.
+                        {% else %}
+                            <div class="rounded-3xl border border-dashed border-white/10 p-4 text-sm text-slate-300">
+                            Recent global history will appear here after the first successful run.
                         </div>
                     {% endfor %}
                 </div>

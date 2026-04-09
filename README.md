@@ -1,6 +1,6 @@
 # NLP-Based-Fake-News-Detection-System-
 
-A production-ready Flask web application for detecting fake news with a custom NLP model and identifying AI-generated images with the Sightengine API. The project includes secure user authentication, per-user analysis history, and a modern Tailwind CSS interface suitable for portfolio presentation and cloud deployment.
+A production-ready Flask web application for detecting fake news with a custom NLP model and identifying AI-generated images with the Sightengine API. The project includes global analysis history and a modern Tailwind CSS interface suitable for portfolio presentation and cloud deployment.
 
 ## Overview
 
@@ -8,8 +8,8 @@ This application combines two AI-assisted verification workflows in one dashboar
 
 - Fake News Detection using a trained `model.pkl` and `vectorizer.pkl`
 - AI Image Detection using Sightengine's `genai` model
-- User registration, login, and logout with hashed passwords
-- Analysis history tracking per user
+- Public access with no login required
+- Global analysis history tracking
 - Responsive glassmorphism UI built with Tailwind CSS
 
 ## Features
@@ -62,10 +62,8 @@ NLP-Based-Fake-News-Detection-System-/
 `-- templates/
     |-- base.html
     |-- home.html
-    |-- login.html
-    |-- register.html
-    |-- dashboard.html
-    `-- history.html
+|-- dashboard.html
+`-- history.html
 ```
 
 ## Model Integration Details
@@ -169,8 +167,6 @@ web: gunicorn app:app
 ## Security Notes
 
 - No API keys are hardcoded
-- Passwords are hashed with Werkzeug security helpers
-- Authenticated routes are protected with Flask-Login
 - Session cookies are configured as HTTP-only
 
 ## Troubleshooting

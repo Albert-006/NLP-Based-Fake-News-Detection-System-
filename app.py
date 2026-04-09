@@ -7,9 +7,7 @@ from pathlib import Path
 import nltk
 import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
-from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,42 +28,23 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 
 db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
-login_manager.login_message_category = "warning"
+http = requests.Session()
 
 _model = None
 _vectorizer = None
 _model_error = None
 
 
-class User(UserMixin, db.Model):
+class History(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    history_entries = db.relationship("AnalysisHistory", backref="user", lazy=True)
-
-
-class AnalysisHistory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     input_text = db.Column(db.Text, nullable=True)
-    prediction = db.Column(db.String(32), nullable=True)
+    prediction = db.Column(db.String(50), nullable=True)
     confidence = db.Column(db.Float, nullable=True)
-    image_result = db.Column(db.String(255), nullable=True)
+    image_result = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))
 
 
 def ensure_stopwords_available():
@@ -93,13 +72,13 @@ def allowed_image(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 
-def load_ml_assets():
+def load_ml_assets(force_retry=False):
     global _model, _vectorizer, _model_error
 
     if _model is not None and _vectorizer is not None:
         return _model, _vectorizer
 
-    if _model_error:
+    if _model_error and not force_retry:
         raise RuntimeError(_model_error)
 
     model_path = MODELS_DIR / "model.pkl"
@@ -116,16 +95,27 @@ def load_ml_assets():
             _model = pickle.load(model_file)
         with vectorizer_path.open("rb") as vectorizer_file:
             _vectorizer = pickle.load(vectorizer_file)
+        _model_error = None
     except Exception as exc:
-        _model_error = f"Failed to load ML assets: {exc}"
+        _model_error = (
+            "Model assets could not be loaded. Verify that model.pkl and vectorizer.pkl are valid "
+            "scikit-learn artifacts."
+        )
         raise RuntimeError(_model_error) from exc
 
     return _model, _vectorizer
 
 
-def analyze_news_text(text):
+def warm_up_dependencies():
     ensure_stopwords_available()
-    model, vectorizer = load_ml_assets()
+    try:
+        load_ml_assets(force_retry=True)
+    except RuntimeError:
+        pass
+
+
+def analyze_news_text(text):
+    model, vectorizer = load_ml_assets(force_retry=True)
     processed_text = clean_text(text)
     vector = vectorizer.transform([processed_text])
     prediction_value = int(model.predict(vector)[0])
@@ -164,7 +154,7 @@ def analyze_image(filepath):
         )
 
     with open(filepath, "rb") as image_file:
-        response = requests.post(
+        response = http.post(
             SIGHTENGINE_ENDPOINT,
             files={"media": image_file},
             data={
@@ -185,9 +175,8 @@ def analyze_image(filepath):
     return parse_image_response(payload)
 
 
-def save_history_entry(*, user_id, input_text=None, prediction=None, confidence=None, image_result=None):
-    entry = AnalysisHistory(
-        user_id=user_id,
+def save_history_entry(*, input_text=None, prediction=None, confidence=None, image_result=None):
+    entry = History(
         input_text=input_text,
         prediction=prediction,
         confidence=confidence,
@@ -198,14 +187,7 @@ def save_history_entry(*, user_id, input_text=None, prediction=None, confidence=
 
 
 def latest_history(limit=5):
-    if not current_user.is_authenticated:
-        return []
-    return (
-        AnalysisHistory.query.filter_by(user_id=current_user.id)
-        .order_by(AnalysisHistory.timestamp.desc())
-        .limit(limit)
-        .all()
-    )
+    return History.query.order_by(History.timestamp.desc()).limit(limit).all()
 
 
 @app.route("/")
@@ -213,68 +195,7 @@ def home():
     return render_template("home.html")
 
 
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
-
-        if not username or not email or not password:
-            flash("Please fill in all required fields.", "error")
-        elif password != confirm_password:
-            flash("Passwords do not match.", "error")
-        elif User.query.filter((User.email == email) | (User.username == username)).first():
-            flash("An account with that email or username already exists.", "error")
-        else:
-            user = User(
-                username=username,
-                email=email,
-                password_hash=generate_password_hash(password),
-            )
-            db.session.add(user)
-            db.session.commit()
-            login_user(user)
-            flash("Account created successfully.", "success")
-            return redirect(url_for("dashboard"))
-
-    return render_template("register.html")
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        user = User.query.filter_by(email=email).first()
-
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            flash("Welcome back.", "success")
-            return redirect(url_for("dashboard"))
-
-        flash("Invalid email or password.", "error")
-
-    return render_template("login.html")
-
-
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    flash("You have been logged out.", "success")
-    return redirect(url_for("home"))
-
-
 @app.route("/dashboard", methods=["GET"])
-@login_required
 def dashboard():
     return render_template(
         "dashboard.html",
@@ -285,7 +206,6 @@ def dashboard():
 
 
 @app.route("/analyze/text", methods=["POST"])
-@login_required
 def analyze_text_route():
     text = request.form.get("news_text", "").strip()
     text_result = None
@@ -297,7 +217,6 @@ def analyze_text_route():
         try:
             text_result = analyze_news_text(text)
             save_history_entry(
-                user_id=current_user.id,
                 input_text=text,
                 prediction=text_result["label"],
                 confidence=text_result["confidence"],
@@ -316,7 +235,6 @@ def analyze_text_route():
 
 
 @app.route("/analyze/image", methods=["POST"])
-@login_required
 def analyze_image_route():
     uploaded_file = request.files.get("image_file")
     text_result = None
@@ -348,7 +266,6 @@ def analyze_image_route():
     try:
         image_result = analyze_image(filepath)
         save_history_entry(
-            user_id=current_user.id,
             image_result=image_result["label"],
             confidence=image_result["confidence"],
         )
@@ -372,13 +289,8 @@ def analyze_image_route():
 
 
 @app.route("/history")
-@login_required
 def history():
-    entries = (
-        AnalysisHistory.query.filter_by(user_id=current_user.id)
-        .order_by(AnalysisHistory.timestamp.desc())
-        .all()
-    )
+    entries = History.query.order_by(History.timestamp.desc()).all()
     return render_template("history.html", entries=entries)
 
 
@@ -395,6 +307,7 @@ def file_too_large(_error):
 
 with app.app_context():
     db.create_all()
+    warm_up_dependencies()
 
 
 if __name__ == "__main__":

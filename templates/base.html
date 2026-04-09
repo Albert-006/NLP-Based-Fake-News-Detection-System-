@@ -70,14 +70,8 @@
                 </a>
                 <div class="flex items-center gap-3 text-sm font-medium text-slate-200">
                     <a href="{{ url_for('home') }}" class="nav-link">Home</a>
-                    {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-                        <a href="{{ url_for('history') }}" class="nav-link">History</a>
-                        <a href="{{ url_for('logout') }}" class="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20">Logout</a>
-                    {% else %}
-                        <a href="{{ url_for('login') }}" class="nav-link">Login</a>
-                        <a href="{{ url_for('register') }}" class="rounded-full bg-white px-4 py-2 text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Get Started</a>
-                    {% endif %}
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                    <a href="{{ url_for('history') }}" class="rounded-full bg-white px-4 py-2 text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">History</a>
                 </div>
             </nav>
         </header>

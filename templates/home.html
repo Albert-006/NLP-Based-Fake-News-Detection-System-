@@ -8,19 +8,15 @@
         </span>
         <div class="space-y-5">
             <h1 class="max-w-3xl font-display text-4xl font-extrabold leading-tight text-white md:text-6xl">
-                Detect fake news and AI-generated imagery with one secure workflow.
+                Detect fake news and AI-generated imagery from one fast public dashboard.
             </h1>
             <p class="max-w-2xl text-lg leading-8 text-slate-200">
-                Combine NLP-powered text classification, Sightengine image forensics, account-based history tracking, and a polished dashboard built for trust and speed.
+                Combine NLP-powered text classification, Sightengine image forensics, global history tracking, and a polished dashboard built for trust and speed.
             </p>
         </div>
         <div class="flex flex-wrap gap-4">
-            {% if current_user.is_authenticated %}
-                <a href="{{ url_for('dashboard') }}" class="inline-flex items-center rounded-full bg-white px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Open Dashboard</a>
-            {% else %}
-                <a href="{{ url_for('register') }}" class="inline-flex items-center rounded-full bg-white px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Create Account</a>
-                <a href="{{ url_for('login') }}" class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-6 py-3 font-semibold text-white transition hover:bg-white/10">Sign In</a>
-            {% endif %}
+            <a href="{{ url_for('dashboard') }}" class="inline-flex items-center rounded-full bg-white px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-brand-100">Open Dashboard</a>
+            <a href="{{ url_for('history') }}" class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-6 py-3 font-semibold text-white transition hover:bg-white/10">View History</a>
         </div>
         <div class="grid gap-4 sm:grid-cols-3">
             <div class="glass-card p-5">
@@ -34,9 +30,9 @@
                 <p class="mt-2 text-sm leading-6 text-slate-300">Checks whether uploaded imagery is AI-generated or authentic with confidence scoring.</p>
             </div>
             <div class="glass-card p-5">
-                <p class="text-sm uppercase tracking-[0.3em] text-brand-100">Security</p>
-                <h3 class="mt-3 text-xl font-bold text-white">Protected Accounts</h3>
-                <p class="mt-2 text-sm leading-6 text-slate-300">Flask-Login auth, password hashing, and user-specific analysis history.</p>
+                <p class="text-sm uppercase tracking-[0.3em] text-brand-100">Tracking</p>
+                <h3 class="mt-3 text-xl font-bold text-white">Global History Feed</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Every successful text or image analysis is saved to a shared, searchable timeline.</p>
             </div>
         </div>
     </div>
@@ -72,7 +68,7 @@
                     </div>
                 </div>
                 <div class="rounded-3xl border border-dashed border-white/15 p-5 text-sm leading-7 text-slate-300">
-                    Use the dashboard to run text and image checks, then revisit everything later from your personal history timeline.
+                    Use the dashboard to run text and image checks, then revisit everything later from the public history timeline.
                 </div>
             </div>
         </div>

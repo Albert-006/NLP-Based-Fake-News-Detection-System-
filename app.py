@@ -1,9 +1,11 @@
 import os
 import pickle
 import secrets
+import logging
 from datetime import datetime
 from pathlib import Path
 
+import joblib
 import nltk
 import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
@@ -13,10 +15,18 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
 UPLOAD_DIR = BASE_DIR / "uploads"
+NLTK_DATA_DIR = BASE_DIR / "nltk_data"
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 SIGHTENGINE_ENDPOINT = "https://api.sightengine.com/1.0/check.json"
+IMAGE_API_TIMEOUT = 8
+
+import re
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
 
 UPLOAD_DIR.mkdir(exist_ok=True)
+NLTK_DATA_DIR.mkdir(exist_ok=True)
+nltk.data.path.append(str(NLTK_DATA_DIR))
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", secrets.token_hex(24))
@@ -32,6 +42,14 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 db = SQLAlchemy(app)
 http = requests.Session()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+)
+
+TEXT_CLEAN_RE = re.compile("[^a-zA-Z]")
+STEMMER = PorterStemmer()
+STOP_WORDS = set()
 
 _model = None
 _vectorizer = None
@@ -49,22 +67,17 @@ class History(db.Model):
 
 def ensure_stopwords_available():
     try:
-        nltk.data.find("corpora/stopwords")
-    except LookupError:
-        nltk.download("stopwords", quiet=True)
+        stopwords.words("english")
+    except Exception:
+        app.logger.warning("NLTK stopwords not found locally. Downloading once to %s", NLTK_DATA_DIR)
+        nltk.download("stopwords", download_dir=str(NLTK_DATA_DIR), quiet=True)
+        stopwords.words("english")
 
 
 def clean_text(text):
-    import re
-    from nltk.corpus import stopwords
-    from nltk.stem import PorterStemmer
-
-    stemmer = PorterStemmer()
-    stop_words = set(stopwords.words('english'))
-
-    text = re.sub('[^a-zA-Z]', ' ', str(text))
+    text = TEXT_CLEAN_RE.sub(' ', str(text))
     text = text.lower().split()
-    text = [stemmer.stem(word) for word in text if word not in stop_words]
+    text = [STEMMER.stem(word) for word in text if word not in STOP_WORDS]
     return ' '.join(text)
 
 
@@ -88,38 +101,60 @@ def load_ml_assets(force_retry=False):
         _model_error = (
             "Model assets are missing. Add model.pkl and vectorizer.pkl to the models directory."
         )
+        app.logger.error(_model_error)
         raise RuntimeError(_model_error)
 
     try:
-        with model_path.open("rb") as model_file:
-            _model = pickle.load(model_file)
-        with vectorizer_path.open("rb") as vectorizer_file:
-            _vectorizer = pickle.load(vectorizer_file)
+        app.logger.info("Loading model assets from %s", MODELS_DIR)
+        try:
+            _model = joblib.load(model_path)
+            _vectorizer = joblib.load(vectorizer_path)
+            app.logger.info("Model assets loaded with joblib")
+        except Exception:
+            app.logger.warning("Joblib load failed, falling back to pickle", exc_info=True)
+            with model_path.open("rb") as model_file:
+                _model = pickle.load(model_file)
+            with vectorizer_path.open("rb") as vectorizer_file:
+                _vectorizer = pickle.load(vectorizer_file)
+            app.logger.info("Model assets loaded with pickle")
         _model_error = None
+        print("Model loaded:", _model is not None)
+        print("Vectorizer loaded:", _vectorizer is not None)
+        app.logger.info("Model loaded successfully")
     except Exception as exc:
         _model_error = (
             "Model assets could not be loaded. Verify that model.pkl and vectorizer.pkl are valid "
             "scikit-learn artifacts."
         )
+        app.logger.exception("Model loading failed")
         raise RuntimeError(_model_error) from exc
 
     return _model, _vectorizer
 
 
 def warm_up_dependencies():
+    global STOP_WORDS
+
+    app.logger.info("Starting dependency warm-up")
     ensure_stopwords_available()
+    STOP_WORDS = set(stopwords.words("english"))
+    app.logger.info("Stopwords loaded: %s", bool(STOP_WORDS))
     try:
         load_ml_assets(force_retry=True)
     except RuntimeError:
-        pass
+        app.logger.warning("Model warm-up skipped because assets are not ready")
 
 
 def analyze_news_text(text):
-    model, vectorizer = load_ml_assets(force_retry=True)
+    app.logger.info("Step 1: Text request received")
+    model, vectorizer = load_ml_assets(force_retry=False)
     processed_text = clean_text(text)
+    app.logger.info("Step 2: Preprocessing done")
     vector = vectorizer.transform([processed_text])
+    app.logger.info("Step 3: Vectorization done")
     prediction_value = int(model.predict(vector)[0])
     confidence = float(model.predict_proba(vector).max() * 100)
+    app.logger.info("Step 4: Prediction done")
 
     label = "FAKE NEWS" if prediction_value == 1 else "REAL NEWS"
     return {
@@ -145,6 +180,7 @@ def parse_image_response(payload):
 
 
 def analyze_image(filepath):
+    app.logger.info("Step 1: Image request received")
     api_user = os.getenv("SIGHTENGINE_API_USER")
     api_secret = os.getenv("SIGHTENGINE_API_SECRET")
 
@@ -162,9 +198,10 @@ def analyze_image(filepath):
                 "api_user": api_user,
                 "api_secret": api_secret,
             },
-            timeout=30,
+            timeout=IMAGE_API_TIMEOUT,
         )
 
+    app.logger.info("Step 2: API response received")
     response.raise_for_status()
     payload = response.json()
 
@@ -172,6 +209,7 @@ def analyze_image(filepath):
         message = payload.get("error", {}).get("message", "Sightengine analysis failed.")
         raise RuntimeError(message)
 
+    app.logger.info("Step 3: Image response parsed")
     return parse_image_response(payload)
 
 
@@ -207,6 +245,7 @@ def dashboard():
 
 @app.route("/analyze/text", methods=["POST"])
 def analyze_text_route():
+    app.logger.info("Text analysis route hit")
     text = request.form.get("news_text", "").strip()
     text_result = None
     image_result = None
@@ -222,7 +261,9 @@ def analyze_text_route():
                 confidence=text_result["confidence"],
             )
             flash("Text analysis completed successfully.", "success")
+            app.logger.info("Step 5: Text response sent")
         except Exception as exc:
+            app.logger.exception("Text analysis failed")
             flash(str(exc), "error")
 
     return render_template(
@@ -236,6 +277,7 @@ def analyze_text_route():
 
 @app.route("/analyze/image", methods=["POST"])
 def analyze_image_route():
+    app.logger.info("Image analysis route hit")
     uploaded_file = request.files.get("image_file")
     text_result = None
     image_result = None
@@ -262,6 +304,7 @@ def analyze_image_route():
     unique_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{filename}"
     filepath = UPLOAD_DIR / unique_name
     uploaded_file.save(filepath)
+    app.logger.info("Image saved to %s", filepath)
 
     try:
         image_result = analyze_image(filepath)
@@ -270,15 +313,31 @@ def analyze_image_route():
             confidence=image_result["confidence"],
         )
         flash("Image analysis completed successfully.", "success")
+        app.logger.info("Step 5: Image response sent")
+    except requests.Timeout:
+        app.logger.exception("Sightengine timeout")
+        image_result = {
+            "label": "Unavailable",
+            "confidence": 0.0,
+            "raw": None,
+        }
+        flash("Image analysis timed out after 8 seconds. Please try again.", "error")
     except requests.RequestException:
+        app.logger.exception("Sightengine request failed")
+        image_result = {
+            "label": "Unavailable",
+            "confidence": 0.0,
+            "raw": None,
+        }
         flash("Image analysis failed because the Sightengine API could not be reached.", "error")
     except Exception as exc:
+        app.logger.exception("Image analysis failed")
         flash(str(exc), "error")
     finally:
         try:
             filepath.unlink(missing_ok=True)
         except Exception:
-            pass
+            app.logger.warning("Failed to remove temporary upload %s", filepath)
 
     return render_template(
         "dashboard.html",
